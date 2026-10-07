@@ -1,6 +1,6 @@
 // Service worker: guarda o app no celular para abrir mesmo sem internet.
 // Estratégia: rede primeiro (pega versão nova), cache como reserva (offline).
-const CACHE = 'treino-plus-v3';
+const CACHE = 'treino-plus-v4';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
