@@ -13,6 +13,8 @@ npm i @capacitor/core@7.6.9 @capacitor/cli@7.6.9 @capacitor/android@7.6.9 @capac
 mkdir www
 cp -r ../site/. www/
 rm -rf www/.git www/.github www/apk
+# arquivo antigo com fichas pessoais: nunca vai para dentro do app
+rm -f www/minhas-fichas.json
 test -f www/index.html || { echo "index.html nao encontrado na raiz do repositorio"; exit 1; }
 # Arquivos .gz viram nomes repetidos no Android (ex.: por.traineddata e por.traineddata.gz) — tira os .gz
 find www -name '*.gz' -print -delete
