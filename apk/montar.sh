@@ -29,12 +29,44 @@ cat > capacitor.config.json <<'JSON'
   "plugins": { "LocalNotifications": { "smallIcon": "ic_stat_treino", "iconColor": "#00E676" } }
 }
 JSON
+# GPS: quando não há rastreador ligado, a notificação "gravando percurso" sempre some
+GEO=node_modules/@capacitor-community/background-geolocation/android/src/main/java/com/equimaps/capacitor_background_geolocation/BackgroundGeolocationService.java
+if [ -f $GEO ]; then
+  perl -0pi -e 's/(                    return;\n                \}\n            \}\n)(        \}\n\n        void onPermissionsGranted)/$1            if (getNotification() == null) {\n                stopForeground(true);\n            }\n$2/' $GEO
+  perl -0pi -e 's/(        watchers = new HashSet<Watcher>\(\);\n)(        stopSelf\(\);)/$1        stopForeground(true);\n$2/' $GEO
+  grep -c "stopForeground(true)" $GEO || true
+fi
 # Alarmes tocam no volume de ALARME do celular (e não no de notificação)
 sed -i 's/AudioAttributes.USAGE_NOTIFICATION/AudioAttributes.USAGE_ALARM/' node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/NotificationChannelManager.java
 grep -c USAGE_ALARM node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/NotificationChannelManager.java || true
 npx cap add android
 npx cap sync android
 RES=android/app/src/main/res
+
+# Se o Android matar a parte que desenha a tela (WebView) em segundo plano, recria a tela em vez de ficar branca
+cat > android/app/src/main/java/com/treinoplus/app/MainActivity.java <<'JAVA'
+package com.treinoplus.app;
+
+import android.os.Bundle;
+import android.webkit.RenderProcessGoneDetail;
+import android.webkit.WebView;
+import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.WebViewListener;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        bridge.addWebViewListener(new WebViewListener() {
+            @Override
+            public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
+                try { recreate(); } catch (Throwable ignored) {}
+                return true;
+            }
+        });
+    }
+}
+JAVA
 command -v convert > /dev/null || sudo apt-get install -y -qq imagemagick > /dev/null
 
 # Icone do app
@@ -68,7 +100,7 @@ sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_
 grep -c EXACT_ALARM $MAN
 
 # Barras do sistema escuras
-sed -i 's#<item name="android:background">@null</item>#<item name="android:background">@null</item><item name="android:statusBarColor">\#0D0D0D</item><item name="android:navigationBarColor">\#0D0D0D</item><item name="android:windowLightStatusBar">false</item><item name="android:forceDarkAllowed">false</item>#' $RES/values/styles.xml
+sed -i 's#<item name="android:background">@null</item>#<item name="android:background">@null</item><item name="android:statusBarColor">\#0D0D0D</item><item name="android:navigationBarColor">\#0D0D0D</item><item name="android:windowLightStatusBar">false</item><item name="android:forceDarkAllowed">false</item><item name="android:windowBackground">@android:color/black</item>#' $RES/values/styles.xml
 
 # Versao do app
 sed -i "s/versionCode 1/versionCode $RUN/; s/versionName \"1.0\"/versionName \"1.$RUN\"/" android/app/build.gradle
