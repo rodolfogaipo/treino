@@ -18,10 +18,43 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <script type="module" crossorigin src="./assets/index-rxzMhMwT.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+  <script>
+  /* Rede de segurança: se o app não abrir, mostra o motivo na tela em vez de ficar em branco. */
+  (function () {
+    var errs = [];
+    function add(m) { try { errs.push(String(m).slice(0, 300)); } catch (e) {} }
+    window.addEventListener('error', function (e) { add((e.message || 'erro') + (e.filename ? ' @ ' + e.filename.split('/').pop() + ':' + e.lineno : '') + (e.target && e.target.src ? ' arquivo: ' + e.target.src.split('/').pop() : '')); }, true);
+    window.addEventListener('unhandledrejection', function (e) { add('promise: ' + (e.reason && (e.reason.message || e.reason))); });
+    window.__treinoErrors = errs;
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) || /localhost/.test(location.hostname);
+    if (native && navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+      if (window.caches && caches.keys) caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {});
+    }
+    window.__treinoShowError = function (extra) {
+      if (document.getElementById('boot-err')) return;
+      if (extra) add(extra);
+      var d = document.createElement('div');
+      d.id = 'boot-err';
+      d.setAttribute('style', 'position:fixed;inset:0;z-index:2000;background:#0D0D0D;color:#fff;font:15px/1.45 sans-serif;padding:32px 22px;overflow:auto');
+      var h = '<div style="font-size:22px;font-weight:800;margin-bottom:10px">O TREINO+ não conseguiu abrir</div>' +
+        '<div style="color:#bbb;margin-bottom:16px">Tire um print desta tela e mande para quem está ajustando o app. Seus dados continuam guardados.</div>' +
+        '<button onclick="location.reload()" style="background:#00E676;color:#0D0D0D;border:0;border-radius:14px;padding:14px 22px;font-weight:800;font-size:16px;margin-bottom:18px">Tentar de novo</button>' +
+        '<pre style="white-space:pre-wrap;word-break:break-word;color:#ff8a65;font-size:12px"></pre>';
+      d.innerHTML = h;
+      d.querySelector('pre').textContent = (errs.length ? errs.join('\n') : 'Sem mensagem de erro') + '\n\n' + navigator.userAgent;
+      document.body.appendChild(d);
+    };
+    setTimeout(function () {
+      var r = document.getElementById('root');
+      if (!window.__treinoStarted || !r || !r.children.length) window.__treinoShowError(window.__treinoStarted ? 'tela vazia' : 'o app não iniciou');
+    }, 12000);
+  })();
+  </script>
+  <script type="module" crossorigin src="./assets/index-em8TtpzA.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-C0FnF6B9.js">
-  <link rel="stylesheet" crossorigin href="./assets/index-OpEn2T9O.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-NjrRHAD1.css">
 </head>
 <body>
   <div id="splash"><img src="./icons/icon-512.png" alt="TREINO+" /></div>

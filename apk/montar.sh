@@ -14,6 +14,8 @@ mkdir www
 cp -r ../site/. www/
 rm -rf www/.git www/.github www/apk
 test -f www/index.html || { echo "index.html nao encontrado na raiz do repositorio"; exit 1; }
+# Arquivos .gz viram nomes repetidos no Android (ex.: por.traineddata e por.traineddata.gz) — tira os .gz
+find www -name '*.gz' -print -delete
 sed -i "s#<head>#<head><meta name=\"site-url\" content=\"$SITE\">#" www/index.html
 cat > capacitor.config.json <<'JSON'
 {

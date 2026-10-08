@@ -1,6 +1,6 @@
 // Service worker: guarda o app no celular para abrir mesmo sem internet.
 // Estratégia: rede primeiro (pega versão nova), cache como reserva (offline).
-const CACHE = 'treino-plus-v15';
+const CACHE = 'treino-plus-v16';
 const CORE = ['./', './index.html', './app.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -13,7 +13,7 @@ self.addEventListener('activate', (e) => {
   );
 });
 self.addEventListener('fetch', (e) => {
-  if (e.request.method !== 'GET') return;
+  if (e.request.method !== 'GET' || self.location.hostname === 'localhost') return;
   e.respondWith(
     fetch(e.request)
       .then((res) => {
@@ -23,6 +23,7 @@ self.addEventListener('fetch', (e) => {
         }
         return res;
       })
-      .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html'))),
+      .catch(() => caches.match(e.request).then((r) => r || (e.request.mode === 'navigate' ? caches.match('./index.html') : null))
+        .then((r) => r || new Response('', { status: 504 }))),
   );
 });
