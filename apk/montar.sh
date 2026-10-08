@@ -17,6 +17,8 @@ test -f www/index.html || { echo "index.html nao encontrado na raiz do repositor
 # Arquivos .gz viram nomes repetidos no Android (ex.: por.traineddata e por.traineddata.gz) — tira os .gz
 find www -name '*.gz' -print -delete
 sed -i "s#<head>#<head><meta name=\"site-url\" content=\"$SITE\">#" www/index.html
+# Sons dos alarmes vão para dentro do app (o app só mostra a escolha de som se eles estiverem lá)
+if ls www/sounds/*.wav > /dev/null 2>&1; then sed -i 's#<head>#<head><meta name="native-sounds" content="1">#' www/index.html; fi
 cat > capacitor.config.json <<'JSON'
 {
   "appId": "com.treinoplus.app",
@@ -27,6 +29,9 @@ cat > capacitor.config.json <<'JSON'
   "plugins": { "LocalNotifications": { "smallIcon": "ic_stat_treino", "iconColor": "#00E676" } }
 }
 JSON
+# Alarmes tocam no volume de ALARME do celular (e não no de notificação)
+sed -i 's/AudioAttributes.USAGE_NOTIFICATION/AudioAttributes.USAGE_ALARM/' node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/NotificationChannelManager.java
+grep -c USAGE_ALARM node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/NotificationChannelManager.java || true
 npx cap add android
 npx cap sync android
 RES=android/app/src/main/res
@@ -53,6 +58,9 @@ for spec in mdpi:24 hdpi:36 xhdpi:48 xxhdpi:72 xxxhdpi:96; do
   mkdir -p $RES/drawable-${spec%%:*}
   convert $LOGO2 -resize ${spec##*:}x${spec##*:} -background none -gravity center -extent ${spec##*:}x${spec##*:} -fill white -colorize 100 $RES/drawable-${spec%%:*}/ic_stat_treino.png
 done
+
+# Sons dos alarmes
+if ls www/sounds/*.wav > /dev/null 2>&1; then mkdir -p $RES/raw && cp www/sounds/*.wav $RES/raw/ && ls $RES/raw; fi
 
 # Permissões extras: alarme na hora exata (lembretes e fim do descanso)
 MAN=android/app/src/main/AndroidManifest.xml
