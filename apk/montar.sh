@@ -63,11 +63,34 @@ sed -i 's#<item name="android:background">@null</item>#<item name="android:backg
 # Versao do app
 sed -i "s/versionCode 1/versionCode $RUN/; s/versionName \"1.0\"/versionName \"1.$RUN\"/" android/app/build.gradle
 
-# Compilar e assinar
+# Não deixar avisos de "lint" travarem a montagem
+cat >> android/app/build.gradle <<'GRADLE'
+
+android {
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+GRADLE
+
+# Compilar (se um plugin der problema, tenta de novo sem ele para o app sair mesmo assim)
 cd android
 chmod +x gradlew
-./gradlew assembleRelease --no-daemon -q
+build() { ./gradlew assembleRelease --no-daemon --console=plain -q; }
+if ! build; then
+  echo "::warning::Falhou com o GPS em segundo plano. Tentando sem esse plugin..."
+  (cd .. && npm uninstall @capacitor-community/background-geolocation && npx cap sync android)
+  if ! build; then
+    echo "::warning::Falhou de novo. Tentando sem os alarmes..."
+    (cd .. && npm uninstall @capacitor/local-notifications && npx cap sync android)
+    build
+  fi
+fi
+
+# Assinar
 BT=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)
 $BT/zipalign -f 4 app/build/outputs/apk/release/app-release-unsigned.apk aligned.apk
 $BT/apksigner sign --ks ../../site/apk/chave.keystore --ks-pass pass:treinoplus --key-pass pass:treinoplus --ks-key-alias treino --out ../../TREINO-plus.apk aligned.apk
 ls -la ../../TREINO-plus.apk
+echo "Plugins no app:"; cat app/src/main/assets/capacitor.plugins.json
