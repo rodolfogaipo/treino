@@ -37,6 +37,13 @@ if [ -f $GEO ]; then
   perl -0pi -e 's/(                    return;\n                \}\n            \}\n)(        \}\n\n        void onPermissionsGranted)/$1            if (getNotification() == null) {\n                stopForeground(true);\n            }\n$2/' $GEO
   perl -0pi -e 's/(        watchers = new HashSet<Watcher>\(\);\n)(        stopSelf\(\);)/$1        stopForeground(true);\n$2/' $GEO
   grep -c "stopForeground(true)" $GEO || true
+  # pedido "treino-limpar": desliga TODO GPS que tenha sobrado e tira a notificação
+  perl -0pi -e 's/(        void removeWatcher\(String id\) \{\n)/$1            if ("treino-limpar".equals(id)) { onUnbind(null); return; }\n/' $GEO
+  grep -c "treino-limpar" $GEO || true
+  # guarda cada ponto do GPS num arquivo (o app recupera o percurso se a tela morrer em segundo plano)
+  perl -0pi -e 's/(                    Location location = locationResult.getLastLocation\(\);\n)/$1                    treinoLog(location, BackgroundGeolocationService.this);\n/' $GEO
+  perl -0pi -e 's/(    Notification getNotification\(\) \{)/    static void treinoLog(Location l, android.content.Context c) {\n        if (l == null || c == null) return;\n        try {\n            String s = l.getTime() + "," + l.getLatitude() + "," + l.getLongitude() + "," + l.getAccuracy() + "," + (l.hasAltitude() ? String.valueOf(l.getAltitude()) : "") + "," + (l.hasSpeed() ? String.valueOf(l.getSpeed()) : "") + "\\n";\n            java.io.FileOutputStream o = new java.io.FileOutputStream(new java.io.File(c.getFilesDir(), "treino-gps.txt"), true);\n            o.write(s.getBytes());\n            o.close();\n        } catch (Throwable ignored) {}\n    }\n\n$1/' $GEO
+  grep -c "treinoLog" $GEO || true
 fi
 # Alarmes tocam no volume de ALARME do celular (e não no de notificação)
 sed -i 's/AudioAttributes.USAGE_NOTIFICATION/AudioAttributes.USAGE_ALARM/' node_modules/@capacitor/local-notifications/android/src/main/java/com/capacitorjs/plugins/localnotifications/NotificationChannelManager.java
@@ -50,22 +57,58 @@ cat > android/app/src/main/java/com/treinoplus/app/MainActivity.java <<'JAVA'
 package com.treinoplus.app;
 
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.WebViewListener;
 
 public class MainActivity extends BridgeActivity {
+    // a tela (WebView) morreu em segundo plano: recria quando o app voltar (o GPS continua gravando)
+    static boolean gone = false;
+    static boolean visible = false;
+    static int check = 0;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         bridge.addWebViewListener(new WebViewListener() {
             @Override
             public boolean onRenderProcessGone(WebView webView, RenderProcessGoneDetail detail) {
-                try { recreate(); } catch (Throwable ignored) {}
+                if (visible) { try { recreate(); } catch (Throwable ignored) {} }
+                else gone = true;
                 return true;
             }
         });
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        visible = true;
+        if (gone) { gone = false; try { recreate(); } catch (Throwable ignored) {} return; }
+        // ao voltar, confere se a tela está desenhando; se não responder, recria (em vez de ficar preta)
+        final int my = ++check;
+        handler.postDelayed(() -> {
+            if (my != check || isFinishing()) return;
+            final boolean[] answered = { false }, bad = { false };
+            try {
+                bridge.getWebView().evaluateJavascript("(window.__treinoOk?window.__treinoOk():1)", v -> { answered[0] = true; bad[0] = "0".equals(v); });
+            } catch (Throwable ignored) {}
+            handler.postDelayed(() -> {
+                if (my != check || isFinishing()) return;
+                if (!answered[0] || bad[0]) { try { recreate(); } catch (Throwable ignored) {} }
+            }, 1600);
+        }, 400);
+    }
+
+    @Override
+    public void onPause() {
+        visible = false;
+        check++;
+        super.onPause();
     }
 }
 JAVA
@@ -102,7 +145,15 @@ sed -i 's#</manifest>#    <uses-permission android:name="android.permission.USE_
 grep -c EXACT_ALARM $MAN
 
 # Barras do sistema escuras
-sed -i 's#<item name="android:background">@null</item>#<item name="android:background">@null</item><item name="android:statusBarColor">\#0D0D0D</item><item name="android:navigationBarColor">\#0D0D0D</item><item name="android:windowLightStatusBar">false</item><item name="android:forceDarkAllowed">false</item><item name="android:windowBackground">@android:color/black</item>#' $RES/values/styles.xml
+sed -i 's#<item name="android:background">@null</item>#<item name="android:background">@null</item><item name="android:statusBarColor">\#0D0D0D</item><item name="android:navigationBarColor">\#0D0D0D</item><item name="android:windowLightStatusBar">false</item><item name="android:forceDarkAllowed">false</item><item name="android:windowBackground">@drawable/treino_bg</item>#' $RES/values/styles.xml
+# fundo da janela: escuro com o logo (aparece em vez de preto se a tela demorar para voltar)
+cat > $RES/drawable/treino_bg.xml <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item><color android:color="#ff0d0d0d" /></item>
+    <item><bitmap android:gravity="center" android:src="@drawable/splash" /></item>
+</layer-list>
+XML
 
 # Versao do app
 sed -i "s/versionCode 1/versionCode $RUN/; s/versionName \"1.0\"/versionName \"1.$RUN\"/" android/app/build.gradle
